@@ -215,6 +215,8 @@ if __name__ == "__main__":
     if status:
       print("COMMAND 'AT+CFUN=0' PASSED!")
 
+    t_start = time.time()
+
     print("\n>>>>>>")
     status = my_bg95_cmd.at_cfun(1)
     if status:
@@ -228,15 +230,17 @@ if __name__ == "__main__":
     if status:
       print(f"COMMAND 'AT+CREG' successfully returned {response}")
 
-    time.sleep(5)
     print("\n>>>>>>")
     NO_SIGNAL = 99
     response = NO_SIGNAL
     while response == NO_SIGNAL:
       status, response = my_bg95_cmd.at_csq()
-      time.sleep(0.1)    
+      time.sleep(.1)    
     if status:
       print(f"COMMAND 'AT+CSQ' successfully returned {response}!")
+
+    t_stop = time.time()
+    print(f"Time taken: {t_stop - t_start}")
 
     print("\n>>>>>>")
     my_bg95_cmd.close()
