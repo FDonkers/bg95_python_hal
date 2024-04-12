@@ -215,6 +215,7 @@ if __name__ == "__main__":
     if status:
       print("COMMAND 'AT+CFUN=0' PASSED!")
 
+    ##### START TIMER
     t_start = time.time()
 
     print("\n>>>>>>")
@@ -239,6 +240,7 @@ if __name__ == "__main__":
     if status:
       print(f"COMMAND 'AT+CSQ' successfully returned {response}!")
 
+    ##### STOP TIMER
     t_stop = time.time()
     print(f"Time taken: {t_stop - t_start}")
 
