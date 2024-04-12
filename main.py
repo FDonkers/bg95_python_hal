@@ -1,3 +1,4 @@
+import time
 import serial
 import logging
 # https://realpython.com/python-logging/ 
@@ -155,13 +156,29 @@ class Bg95_cmd (Bg95_serial):
           return False
     return True
 
+  def at_creg(self):
+    cmd = "AT+CREG?"
+    connection_status = 1
+    status, response = self._send_atcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(f"response = {response}")
+      connection_status = int(response.split(",")[1][:1])
+      logging.debug(f"connection status = {connection_status}")
+      return status, connection_status
+
+    return False, None
+
   def at_csq(self):
     cmd = "AT+CSQ"
     status, response = self._send_atcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-    return status, response
+      signal_quality = int(response.split(":")[1].split(",")[0])
+      logging.debug(f"signal quality = {signal_quality}")
+      return status, signal_quality
 
+    return False, None
+  
 if __name__ == "__main__":
     my_bg95_cmd = Bg95_cmd()
 
@@ -203,10 +220,23 @@ if __name__ == "__main__":
     if status:
       print("COMMAND 'AT+CFUN=1' PASSED!")
 
-    print("\n>>>>>>")
-    status = my_bg95_cmd.at_csq()
+    print("\n>>>>>>") 
+    response = 0
+    while response != 1:
+      status, response = my_bg95_cmd.at_creg()
+      time.sleep(.1)
     if status:
-      print("COMMAND 'AT+CSQ' PASSED!")
+      print(f"COMMAND 'AT+CREG' successfully returned {response}")
+
+    time.sleep(5)
+    print("\n>>>>>>")
+    NO_SIGNAL = 99
+    response = NO_SIGNAL
+    while response == NO_SIGNAL:
+      status, response = my_bg95_cmd.at_csq()
+      time.sleep(0.1)    
+    if status:
+      print(f"COMMAND 'AT+CSQ' successfully returned {response}!")
 
     print("\n>>>>>>")
     my_bg95_cmd.close()
