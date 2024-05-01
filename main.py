@@ -75,8 +75,8 @@ class Bg95_serial:
 ############################################################################################################
 
 class Bg95_ATcmds (Bg95_serial):
-  _RESPONSE_OK = "OK"
-  _RESPONSE_NOK = "ERROR"
+  _RESPONSES = ["OK", "ERROR", "+CME ERROR:"]
+  
   _CID = 1
   _PDP_TYPE = "IPV4V6"
   _APN_OPENINTERNET = "internet.m2m"
@@ -93,13 +93,14 @@ class Bg95_ATcmds (Bg95_serial):
     return self._read_line()
 
   def _read_ok(self, timeout=DEFAULT_TIMEOUT):
-    status, response = self._read_line(timeout)
+    status, cmd, response = self._read_line(timeout)
     if status:
       return response == self._RESPONSE_OK
     else:
       return False
 
   def _send_ATcmd(self, cmd="", timeout=DEFAULT_TIMEOUT):
+    logging.debug("\n>>>>>>")
     logging.debug(f"sending {cmd}")
     if not self._write_line(cmd):
       logging.error(f"not able to send {cmd}")
@@ -110,20 +111,25 @@ class Bg95_ATcmds (Bg95_serial):
       return False, None
 
     # collect response
-    response = ""
     line = ""
-    while line not in [self._RESPONSE_OK, self._RESPONSE_NOK]:
+    response = ""
+    found = False
+
+    while not found:
       status, line = self._read_reponse(timeout)
       if status:
         response += '< ' + line + "\n"
+        if any(line.startswith(res) for res in self._RESPONSES):
+          found = True
       else:
-        logging.error(f"incomplete response for {cmd}")
+        logging.error(f"unexpected response for {cmd}")
         return False, None
 
-    if line != self._RESPONSE_OK:
+    if line.startswith(self._RESPONSES[0]):
+      return True, response
+    else:
       logging.error(f"did not receive 'OK' for {cmd}")
-      return False, None
-    return True, response
+      return False, response
 
   def _wait_for_urc(self, urc="", timeout=DEFAULT_TIMEOUT):
     # collect all responses until given URC is found
@@ -133,53 +139,53 @@ class Bg95_ATcmds (Bg95_serial):
       logging.debug(line)
       if status:
         response += '< ' + line + "\n"
-        if urc in line:
+        if line.startswith(urc):
           return True, response
       else:
-        logging.error(f"incomplete response for {urc}")
+        logging.error(f"incorrect response for {urc}")
         return False
 
   def AT(self):
     # Generic AT command to check if modem is alive
     cmd = "AT"
     status, response = self._send_ATcmd(cmd, 0)
-    return status, response
+    return status, cmd, response
 
   def ATE(self, echo_on=True):
     # Set echo on or off
     cmd = "ATE1" if echo_on else "ATE0"
     status, response = self._send_ATcmd(cmd, 0)
-    return status, response
+    return status, cmd, response
 
   def ATI(self):
     # Request product identification information
     cmd = "ATI"
     status, response = self._send_ATcmd(cmd, 4)
-    return status, response
+    return status, cmd, response
 
   def AT_GSN(self):
     # Request product serial number identification (IMEI  number)
     cmd = "AT+GSN"
     status, response = self._send_ATcmd(cmd, 2)
-    return status, response
+    return status, cmd, response
 
   def AT_V(self):
     # Request current configuration
     cmd = "AT&V"
     status, response = self._send_ATcmd(cmd, 18)
-    return status, response
+    return status, cmd, response
   
   def AT_CFUN(self, radio_on=False):
     # Set radio on or off
     cmd = "AT+CFUN=1" if radio_on else "AT+CFUN=0"
     if not self._send_ATcmd(cmd, DEFAULT_TIMEOUT):
-      return False
+      return False, cmd
     if radio_on:
       urcs = ["+CPIN: READY", "+QUSIM: 1", "+QIND: SMS DONE"]
       for urc in urcs:
         if not self._wait_for_urc(urc, timeout=10):
-          return False
-    return True
+          return False, cmd
+    return True, cmd
 
   def AT_CREG(self):
     # Request network registration status
@@ -190,9 +196,9 @@ class Bg95_ATcmds (Bg95_serial):
       logging.debug(f"response = {response}")
       connection_status = int(response.split(",")[1][:1])
       logging.debug(f"connection status = {connection_status}")
-      return status, connection_status
+      return status, cmd, connection_status
 
-    return False, None
+    return False, cmd, None
 
   def AT_CSQ(self):
     # Request signal quality (RSSI)
@@ -202,9 +208,9 @@ class Bg95_ATcmds (Bg95_serial):
       logging.debug(response)
       signal_quality = int(response.split(":")[1].split(",")[0])
       logging.debug(f"signal quality = {signal_quality}")
-      return status, signal_quality
+      return status, cmd, signal_quality
 
-    return False, None
+    return False, cmd, None
 
   def AT_CGATT_REQUEST(self):
     # Request GPRS attach status
@@ -212,9 +218,9 @@ class Bg95_ATcmds (Bg95_serial):
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-      return status, response
+      return status, cmd, response
 
-    return False, None
+    return False, cmd, None
   
   def AT_CGEREP_REQUEST(self):
     # Request GPRS event reporting
@@ -223,9 +229,9 @@ class Bg95_ATcmds (Bg95_serial):
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-      return status, response
+      return status, cmd, response
 
-    return False, None
+    return False, cmd, None
 
   def AT_CGPADDR_REQUEST(self):
     # Request PDP IP address
@@ -233,9 +239,9 @@ class Bg95_ATcmds (Bg95_serial):
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-      return status, response
+      return status, cmd, response
 
-    return False, None
+    return False, cmd, None
 
   def AT_CGDCONT_REQUEST(self):
     # Request PDP context
@@ -243,7 +249,7 @@ class Bg95_ATcmds (Bg95_serial):
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-      return status, response
+      return status, cmd, response
 
     return False, None
   
@@ -253,14 +259,14 @@ class Bg95_ATcmds (Bg95_serial):
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
-      return status, response
+      return status, cmd, response
 
     return False, None
   
   #ToDo: add more commands
   
 ############################################################################################################
-# QUECTEL SPECIFIC FUNCTIONS
+# QUECTEL MISC FUNCTIONS
 ############################################################################################################
 
   def AT_QPING(self):
@@ -274,12 +280,12 @@ class Bg95_ATcmds (Bg95_serial):
       status, response = self._wait_for_urc("+QPING: 0,4", DEFAULT_TIMEOUT)
       if status:
         logging.debug(response)
-        return status, response
-    return False, None
+        return status, cmd, response
+    return False, cmd, None
 
   def AT_QNTP(self):
     # request time from NTP server
-    cmd = 'AT+QNTP=1,"nl.pool.ntp.org"' # google DNS
+    cmd = 'AT+QNTP=1,"nl.pool.ntp.org",123' # google DNS
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
@@ -287,69 +293,101 @@ class Bg95_ATcmds (Bg95_serial):
       status, response = self._wait_for_urc("+QNTP:", DEFAULT_TIMEOUT)
       if status:
         logging.debug(response)
-        return status, response
-    return False, None
+        return status, cmd, response
+    return False, cmd, None
+
+############################################################################################################
+# QUECTEL GNSS FUNCTIONS
+############################################################################################################
+
+  def AT_QGPSCFG_PRIO(self, gnss_prio=1):
+    # set GNSS priority to 0 (GNSS) or 1 (WWAN)
+    cmd = f'AT+QGPSCFG="priority",{gnss_prio},0'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QGPS_ON(self):
+    # switch GNSS ON
+    cmd = f'AT+QGPS=1,1'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QGPS_STATUS_REQUEST(self):
+    # query GNSS ON/OFF status
+    cmd = f'AT+QGPS?'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QGPSLOC_REQUEST(self):
+    # query GNSS location
+    cmd = f'AT+QGPSLOC?'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
+  def AT_QGPS_END(self):
+    # switch GNSS OFF
+    cmd = f'AT+QGPSEND'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, None
 
 ############################################################################################################
 # MISC SUPPORT FUNCTIONS
 ############################################################################################################
 
 def modem_run_general_at_commands():
-  logging.debug("\n>>>>>>")
-  cmd = "COMMAND 'AT'"
   status = my_Bg95.AT()
   if status:
-    logging.info(f"{cmd} PASSED!")
+    logging.info(f"PASSED!")
   else:
     logging.info(f"{cmd} FAILED!")
     return False
 
-  logging.debug("\n>>>>>>")
-  cmd = "COMMAND 'ATI'"
-  status, response = my_Bg95.ATI()
+  status, cmd, response = my_Bg95.ATI()
   if status:
-    logging.info(f"{cmd} PASSED!")
-    logging.info(response)
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.info(f"{cmd} FAILED!")
     return False
 
-  logging.debug("\n>>>>>>")
-  cmd = "COMMAND 'ATE'"
-  status, response = my_Bg95.ATE(True)
+  status, cmd, response = my_Bg95.ATE(True)
   if status:
-    logging.info(f"{cmd} PASSED!")
-    logging.info(response)
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.info(f"{cmd} FAILED!")
     return False
 
-  logging.debug("\n>>>>>>")
-  cmd = "COMMAND 'AT+GSN'"
-  status, response = my_Bg95.AT_GSN()
+  status, cmd, response = my_Bg95.AT_GSN()
   if status:
-    logging.info(f"{cmd} PASSED!")
-    logging.info(response)
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.info(f"{cmd} FAILED!")
     return False
 
-  logging.debug("\n>>>>>>")
-  cmd = "COMMAND 'AT+CCLK?'"
-  status, response = my_Bg95.AT_CCLK_REQUEST()
+  status, cmd, response = my_Bg95.AT_CCLK_REQUEST()
   if status:
-    logging.info(f"{cmd} PASSED!")
-    logging.info(response)
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.info(f"{cmd} FAILED!")
     return False
 
-  # logging.debug("\n>>>>>>")
-  # cmd = "COMMAND 'AT&V'"
-  # status, response = my_Bg95.AT_V()
+  # status, cmd, response = my_Bg95.AT_V()
   # if status:
-  #   print(f"{cmd} PASSED!")
-  #   print(response)
+    # logging.info(f"{cmd} PASSED! with response:\n{response}")
   # else:
   #   logging.info(f"{cmd} FAILED!")
   #   return False
@@ -357,133 +395,150 @@ def modem_run_general_at_commands():
   return True
 
 def modem_connect_to_network():
-    logging.debug("\n>>>>>>")
-    status = my_Bg95.AT_CFUN(0)
-    if status:
-      logging.info("COMMAND 'AT+CFUN=0' PASSED!")
+  status, cmd = my_Bg95.AT_CFUN(0)
+  if status:
+    logging.info(f"{cmd} PASSED!")
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CFUN=1'"
-    status = my_Bg95.AT_CFUN(1)
-    if status:
-      logging.info(f"{cmd} PASSED!")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd = my_Bg95.AT_CFUN(1)
+  if status:
+    logging.info(f"{cmd} PASSED!")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CGEREP?"
-    status, response = my_Bg95.AT_CGEREP_REQUEST()
-    if status:
-      logging.info(f"{cmd} PASSED!")
-      logging.info(response)
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_CGEREP_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CREG'"
-    response = 0
-    while response != 1:
-      status, response = my_Bg95.AT_CREG()
-      time.sleep(.1)
-    if status:
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  response = 0
+  while response != 1:
+    status, cmd, response = my_Bg95.AT_CREG()
+    time.sleep(.1)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CGATT?'"
-    status, response = my_Bg95.AT_CGATT_REQUEST()
-    if status:
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_CGATT_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CSQ'"
-    NO_SIGNAL = 99
-    response = NO_SIGNAL
-    while response == NO_SIGNAL:
-      status, response = my_Bg95.AT_CSQ()
-      time.sleep(.1)    
-    if status:
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  NO_SIGNAL = 99
+  response = NO_SIGNAL
+  while response == NO_SIGNAL:
+    status, cmd, response = my_Bg95.AT_CSQ()
+    time.sleep(.1)    
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CGDCONT?'"
-    status, response = my_Bg95.AT_CGDCONT_REQUEST()
-    if status:
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_CGDCONT_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CGPADDR=" + str(my_Bg95._CID) + "'"
-    status, response = my_Bg95.AT_CGPADDR_REQUEST()
-    if status:
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_CGPADDR_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CGEREP?"
-    status, response = my_Bg95.AT_CGEREP_REQUEST()
-    if status:
-      logging.info(f"{cmd} PASSED!")
-      logging.info(response)
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_CGEREP_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    return True
+  return True
+
+def modem_run_GNSS_commands():
+  status, cmd, response = my_Bg95.AT_QGPSCFG_PRIO()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_Bg95.AT_QGPS_END()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_Bg95.AT_QGPS_ON()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_Bg95.AT_QGPS_STATUS_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
+
+  # time.sleep(10)
+  status, cmd, response = my_Bg95.AT_QGPSLOC_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    logging.info(f"returned {response}")
+    return False
+
+  status, cmd, response = my_Bg95.AT_QGPS_END()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
 def modem_run_IP_commands():
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+QPING'"
-    status, response = my_Bg95.AT_QPING()
-    if status:
-      logging.info(f"{cmd} PASSED!")
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_QPING()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+QNTP'"
-    status, response = my_Bg95.AT_QNTP()
-    if status:
-      logging.info(f"{cmd} PASSED!")
-      logging.info(f"{cmd} successfully returned {response}")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd, response = my_Bg95.AT_QNTP()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    return True
+  return True
 
 def modem_disconnect_from_network():
-    logging.debug("\n>>>>>>")
-    cmd = "COMMAND 'AT+CFUN=0'"
-    status = my_Bg95.AT_CFUN(0)
-    if status:
-      logging.info(f"{cmd} PASSED!")
-    else:
-      logging.info(f"{cmd} FAILED!")
-      return False
+  status, cmd = my_Bg95.AT_CFUN(0)
+  if status:
+    logging.info(f"{cmd} PASSED!")
+  else:
+    logging.info(f"{cmd} FAILED!")
+    return False
 
-    return True
+  return True
 
 ############################################################################################################
 # MAIN
 ############################################################################################################
-
   
 if __name__ == "__main__":
     my_Bg95 = Bg95_ATcmds()
@@ -506,6 +561,8 @@ if __name__ == "__main__":
     t_stop = time.time()
     logging.info(f"Time taken: {t_stop - t_start}\n")
 
+    modem_run_GNSS_commands()
+  
     modem_run_IP_commands()
 
     modem_disconnect_from_network()
