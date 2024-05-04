@@ -11,7 +11,7 @@ DEFAULT_TIMEOUT = 1
 ############################################################################################################
 
 class Bg95_serial:
-  _port = 'COM7'
+  _port = 'COM11'
   _baudrate = 115200
   _ser = None
   _connected = False
@@ -188,8 +188,21 @@ class Bg95_ATcmds (Bg95_serial):
     return True, cmd
 
   def AT_CREG(self):
-    # Request network registration status
+    # Request GSM network registration status
     cmd = "AT+CREG?"
+    connection_status = 1
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(f"response = {response}")
+      connection_status = int(response.split(",")[1][:1])
+      logging.debug(f"connection status = {connection_status}")
+      return status, cmd, connection_status
+
+    return False, cmd, None
+
+  def AT_CEREG(self):
+    # Request LTE network registration status
+    cmd = "AT+CEREG?"
     connection_status = 1
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
@@ -300,6 +313,40 @@ class Bg95_ATcmds (Bg95_serial):
 # QUECTEL GNSS FUNCTIONS
 ############################################################################################################
 
+  GNSS_ERROR_CODES =  {
+    501: "Invalid parameter",
+    502: "Operation not supported",
+    503: "GNSS subsystem busy",
+    504: "Session is ongoing",
+    505: "Session not active",
+    506: "Operation timeout",
+    507: "Function not enabled",
+    508: "Time information error",
+    509: "XTRA not enabled",
+    512: "Validity time is out of range",
+    513: "Internal resource error",
+    514: "GNSS locked",
+    515: "End by E911",
+    516: "No fix",
+    517: "Geo-fence ID does not exist",
+    518: "Sync time failed",
+    519: "XTRA file does not exist",
+    520: "XTRA file on downloading",
+    521: "XTRA file is valid",
+    522: "GNSS is working",
+    523: "Time injection error",
+    524: "XTRA file is invalid",
+    549: "Unknown error"
+  }
+
+  def extract_urc(response, urc): 
+    # extract URC response
+    for line in response.split("\n"):
+      if line.startswith('< '+urc):
+        r = line.split(":")[1].strip()
+        return True, r
+    return False, None
+
   def AT_QGPSCFG_PRIO(self, gnss_prio=1):
     # set GNSS priority to 0 (GNSS) or 1 (WWAN)
     cmd = f'AT+QGPSCFG="priority",{gnss_prio},0'
@@ -312,6 +359,15 @@ class Bg95_ATcmds (Bg95_serial):
   def AT_QGPS_ON(self):
     # switch GNSS ON
     cmd = f'AT+QGPS=1,1'
+    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
+    if status:
+      logging.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QGPS_END(self):
+    # switch GNSS OFF
+    cmd = f'AT+QGPSEND'
     status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
     if status:
       logging.debug(response)
@@ -336,14 +392,6 @@ class Bg95_ATcmds (Bg95_serial):
       return status, cmd, response
     return False, cmd, response
 
-  def AT_QGPS_END(self):
-    # switch GNSS OFF
-    cmd = f'AT+QGPSEND'
-    status, response = self._send_ATcmd(cmd, DEFAULT_TIMEOUT)
-    if status:
-      logging.debug(response)
-      return status, cmd, response
-    return False, cmd, None
 
 ############################################################################################################
 # MISC SUPPORT FUNCTIONS
@@ -465,48 +513,85 @@ def modem_connect_to_network():
   return True
 
 def modem_run_GNSS_commands():
-  status, cmd, response = my_Bg95.AT_QGPSCFG_PRIO()
+  # set priority to GNSS
+  status, cmd, response = my_Bg95.AT_QGPSCFG_PRIO(gnss_prio=0)
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  status, cmd, response = my_Bg95.AT_QGPS_END()
-  if status:
-    logging.info(f"{cmd} PASSED! with response:\n{response}")
-  else:
-    logging.info(f"{cmd} FAILED!")
-    return False
-
-  status, cmd, response = my_Bg95.AT_QGPS_ON()
-  if status:
-    logging.info(f"{cmd} PASSED! with response:\n{response}")
-  else:
-    logging.info(f"{cmd} FAILED!")
-    return False
-
+  # check if GNSS is already ON
   status, cmd, response = my_Bg95.AT_QGPS_STATUS_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
+    status, urc = Bg95_ATcmds.extract_urc(response, "+QGPS")
+    gps_on = (urc[0] == '1')
+    logging.info(f"GPS is ON") if (gps_on == True) else logging.info(f"GPS is OFF")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  # time.sleep(10)
-  status, cmd, response = my_Bg95.AT_QGPSLOC_REQUEST()
+  # switch ON GNSS if not already ON  
+  if not gps_on:
+    status, cmd, response = my_Bg95.AT_QGPS_ON()
+    if status:
+      logging.info(f"{cmd} PASSED! with response:\n{response}")
+    else:
+      logging.error(f"{cmd} FAILED!")
+      return False
+
+  # check if GNSS is indeed switched ON
+  status, cmd, response = my_Bg95.AT_QGPS_STATUS_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
+    status, urc = Bg95_ATcmds.extract_urc(response, "+QGPS")
+    gps_on = (urc[0] == '1')
+    logging.info(f"GPS is ON") if (gps_on == True) else logging.info(f"GPS is OFF")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+  if not gps_on:
+    logging.error(f"GPS is still OFF")
+    return False
+
+  # get GPS location
+  got_fix = False
+  while not got_fix:
+    time.sleep(1)
+    status, cmd, response = my_Bg95.AT_QGPSLOC_REQUEST()
+    if status:
+      # check if fix is obtained
+      s, urc = Bg95_ATcmds.extract_urc(response, "+CME ERROR")
+      got_fix = (urc == None)
+
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+    status, res = Bg95_ATcmds.extract_urc(response, "+QGPSLOC")
+    logging.info(f"GPS response = {res}")
+    r = res.split(",")
+    logging.info(f"Timestamp = {r[0]}")
+    logging.info(f"Latitude  = {r[1]}")
+    logging.info(f"Longitude = {r[2]}\n")
   else:
     logging.info(f"{cmd} FAILED!")
     logging.info(f"returned {response}")
     return False
 
+  # switch OFF GNSS
   status, cmd, response = my_Bg95.AT_QGPS_END()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.info(f"{cmd} FAILED!")
+    return False
+
+  # set priority to WWAN
+  status, cmd, response = my_Bg95.AT_QGPSCFG_PRIO(gnss_prio=1)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
     return False
 
 def modem_run_IP_commands():
@@ -549,27 +634,27 @@ if __name__ == "__main__":
       print("FAILED TO OPEN USB CONNECTION")
       exit()
 
-    modem_run_general_at_commands()
-
-    ##### START TIMER
-    t_start = time.time()
-
-    modem_connect_to_network()
-
-
-    ##### READ TIMER
-    t_stop = time.time()
-    logging.info(f"Time taken: {t_stop - t_start}\n")
+    # modem_run_general_at_commands()
 
     modem_run_GNSS_commands()
   
-    modem_run_IP_commands()
+    # ##### START TIMER
+    # t_start = time.time()
 
-    modem_disconnect_from_network()
+    # modem_connect_to_network()
+
+
+    # ##### READ TIMER
+    # t_stop = time.time()
+    # logging.info(f"Time taken: {t_stop - t_start}\n")
+
+    # modem_run_IP_commands()
+
+    # modem_disconnect_from_network()
     
-    ##### READ TIMER
-    t_stop = time.time()
-    logging.info(f"Time taken: {t_stop - t_start}\n")
+    # ##### READ TIMER
+    # t_stop = time.time()
+    # logging.info(f"Time taken: {t_stop - t_start}\n")
 
     my_Bg95.close_usb()
 
