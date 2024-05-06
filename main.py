@@ -1,14 +1,10 @@
 import time
-import serial
 import logging
 from timer import timer
-from bg95_serial import bg95_serial
 from bg95_atcmds import bg95_atcmds
 
 # https://realpython.com/python-logging/ ; levels are DEBUG, INFO, WARNING, ERROR, CRITICAL
 logging.basicConfig(format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S', level=logging.INFO)
-
-
 
 ############################################################################################################
 # MISC SUPPORT FUNCTIONS

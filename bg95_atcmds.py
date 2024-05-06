@@ -1,6 +1,4 @@
-import time
 import logging
-import serial
 from bg95_serial import bg95_serial
 
 ############################################################################################################
