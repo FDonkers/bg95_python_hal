@@ -319,26 +319,67 @@ def run_modem_HTTP_commands():
 def HTTP_GET(url):
   status, cmd, response = my_bg95.AT_QHTTPURL(url)
   if status:
-    logging.debug(f"{cmd} PASSED! with response:\n{response}")
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.error(f"{cmd} FAILED!")
     return False, None
 
   status, cmd, response = my_bg95.AT_QHTTPGET()
   if status:
-    logging.debug(f"{cmd} PASSED! with response:\n{response}")
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
     logging.error(f"{cmd} FAILED!")
     return False, None
 
   status, cmd, response = my_bg95.AT_QHTTPREAD()
   if status:
-    logging.debug(f"{cmd} PASSED! with response:\n{response}")
+    logging.info(f"{cmd} PASSED!")
   else:
     logging.error(f"{cmd} FAILED!")
     return False, None
 
   return True, response
+
+def HTTPS_GET(url):
+  status, cmd, response = my_bg95.AT_QHTTPCFG_RESPONSEHEADER(True)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QHTTPCFG_SSLCTXID()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_SSLVERSION()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_CIPHERSUITE()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_SECLEVEL()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  run_modem_HTTP_commands()
+
+  status, response = HTTP_GET(url)
+  return status, response
 
 ############################################################################################################
 # MAIN
@@ -354,27 +395,29 @@ if __name__ == "__main__":
     print("FAILED TO OPEN USB CONNECTION")
     exit()
 
-  run_modem_general_at_commands()
+  # run_modem_general_at_commands()
 
-  run_modem_GNSS_commands()
+  # run_modem_GNSS_commands()
 
   ##### START TIMER
   my_timer.start()
 
   connect_modem_to_network()
-  request_network_info()
+  # request_network_info()
 
   ##### READ TIMER
   my_timer.time_passed()
 
-  run_modem_IP_commands()
+  # run_modem_IP_commands()
 
   ##### READ TIMER
   my_timer.time_passed()
 
-  run_modem_HTTP_commands()
+  # run_modem_HTTP_commands()
 
-  status, response = HTTP_GET("http://echo.free.beeceptor.com/?test=12345")
+  #TODO: fix SSL part of HTTPS_GET
+  status, response = HTTPS_GET("http://echo.free.beeceptor.com/?test=12345")
+  # status, response = HTTP_GET("http://echo.free.beeceptor.com/?test=12345")
   if status:
     logging.info(f"HTTP GET PASSED! with response:\n{response}")
   else:

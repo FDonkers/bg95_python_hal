@@ -453,7 +453,33 @@ class bg95_atcmds (bg95_serial):
 ############################################################################################################
 # QUECTEL SSL FUNCTIONS
 ############################################################################################################
-#TBD
+
+  def AT_QSSLCFG_SSLVERSION(self):
+    # set SSL verification mode to 1 (TLS1.0) or 2 (TLS1.2)
+    cmd = f'AT+QSSLCFG="sslversion",1,1'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
+  def AT_QSSLCFG_CIPHERSUITE(self):
+    # set SSL cipher suite to: all
+    cmd = f'AT+QSSLCFG="ciphersuite",1,0xFFFF'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
+  def AT_QSSLCFG_SECLEVEL(self):
+    # set SSL security level to 0 (no CA certificate verification)
+    cmd = f'AT+QSSLCFG="seclevel",1,0'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
 
 ############################################################################################################
 # QUECTEL HTTP(S) FUNCTIONS
@@ -502,6 +528,24 @@ class bg95_atcmds (bg95_serial):
       return status, cmd, response
     return False, cmd, response
 
+  def AT_QHTTPCFG_RESPONSEHEADER(self, on=False):
+    # set SSL context ID to 1
+    cmd = f'AT+QHTTPCFG="responseheader",1' if on else f'AT+QHTTPCFG="responseheader",0'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
+  def AT_QHTTPCFG_SSLCTXID(self):
+    # set SSL context ID to 1
+    cmd = f'AT+QHTTPCFG="sslctxid",1'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
   def AT_QIACT_REQUEST(self):
     # query IP address
     cmd = f'AT+QIACT?'
@@ -513,7 +557,7 @@ class bg95_atcmds (bg95_serial):
 
   def AT_QHTTPURL(self, url="http://echo.free.beeceptor.com/?test=3"):
     # set URL
-    URL_TIMEOUT = 60
+    URL_TIMEOUT = 80
     cmd = f'AT+QHTTPURL={len(url)}'
     status, response = self._AT_send_cmd(cmd, timeout=URL_TIMEOUT)
     if status:
@@ -526,7 +570,8 @@ class bg95_atcmds (bg95_serial):
     return False, cmd, response
   
   def AT_QHTTPGET(self):
-    GET_TIMEOUT = 5
+    # send GET request
+    GET_TIMEOUT = 80
     cmd = f'AT+QHTTPGET={GET_TIMEOUT}'
     status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
     if status:
@@ -538,7 +583,8 @@ class bg95_atcmds (bg95_serial):
     return False, cmd, response
 
   def AT_QHTTPREAD(self):
-    GET_TIMEOUT = 5
+    # read GET response
+    GET_TIMEOUT = 80
     cmd = f'AT+QHTTPREAD={GET_TIMEOUT}'
     status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
     if status:
