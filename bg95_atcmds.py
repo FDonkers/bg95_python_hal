@@ -472,6 +472,7 @@ class bg95_atcmds (bg95_serial):
       return status, cmd, response
     return False, cmd, response
 
+  #TODO: add support for CA certificates
   def AT_QSSLCFG_SECLEVEL(self):
     # set SSL security level to 0 (no CA certificate verification)
     cmd = f'AT+QSSLCFG="seclevel",1,0'
