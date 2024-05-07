@@ -372,12 +372,13 @@ if __name__ == "__main__":
   ##### READ TIMER
   my_timer.time_passed()
 
-  # run_modem_HTTP_commands()
+  run_modem_HTTP_commands()
+
   status, response = HTTP_GET("http://echo.free.beeceptor.com/?test=12345")
   if status:
     logging.info(f"HTTP GET PASSED! with response:\n{response}")
   else:
-    logging.info(f"HTTP GET FAILED!")
+    logging.error(f"HTTP GET FAILED!")
 
   ##### READ TIMER
   my_timer.time_passed()
