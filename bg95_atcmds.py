@@ -1,248 +1,370 @@
-import logging
 from bg95_serial import bg95_serial
 
 ############################################################################################################
-# class Bg95_ATcmds: GENERAL 3GPP AT COMMANDS
+# class bg95_atcmds: 3GPP AT COMMANDS
 ############################################################################################################
 
-class bg95_atcmds (bg95_serial, ):
-  _RESPONSES = ["OK", "ERROR", "+CME ERROR:"]
+class bg95_atcmds (bg95_serial):
+  _RESPONSE_OK = "OK"
+  _RESPONSE_CONNECT = "CONNECT"
+  _RESPONSE_ERROR = "ERROR"
+  _RESPONSE_CME_ERROR = "+CME ERROR:"
+  _RESPONSES_OK = (_RESPONSE_OK, _RESPONSE_CONNECT)
+  _RESPONSES_NOK = (_RESPONSE_ERROR, _RESPONSE_CME_ERROR)
+  _RESPONSES = _RESPONSES_OK + _RESPONSES_NOK
   
   _CID = 1
   _PDP_TYPE = "IPV4V6"
   _APN_OPENINTERNET = "internet.m2m"
   _APN_KNPTHINGS = "kpnthings.m2m"
-  _DEFAULT_TIMEOUT = 1
+  _DEFAULT_TIMEOUT = 5  #seconds
   _my_logger = None
 
-  def __init__(self, log_handle=None):
-    self._my_logger = log_handle
+  def __init__(self, logger=None):
+    self._my_logger = logger
     super().__init__(log_handle=self._my_logger, default_timeout = self._DEFAULT_TIMEOUT)
     pass
 
-  def _read_echo(self, timeout=_DEFAULT_TIMEOUT):
-    # ToDo: check echo response
-    return self._read_line(timeout)
+############################################################################################################
+# BASIC AT CMD FUNCTIONS
+############################################################################################################
 
-  def _read_reponse(self, timeout=_DEFAULT_TIMEOUT):
-    return self._read_line()
-
-  def _read_ok(self, timeout=_DEFAULT_TIMEOUT):
-    status, cmd, response = self._read_line(timeout)
-    if status:
-      return response == self._RESPONSE_OK
-    else:
-      return False
-
-  def _send_ATcmd(self, cmd="", timeout=_DEFAULT_TIMEOUT):
-    logging.debug("\n>>>>>>")
-    logging.debug(f"sending {cmd}")
+  def _AT_send_cmd(self, cmd="", timeout=_DEFAULT_TIMEOUT):
+    self._my_logger.info(">>>>>>")
+    self._my_logger.info(f"sending {cmd}")
     if not self._write_line(cmd):
-      logging.error(f"not able to send {cmd}")
+      self._my_logger.error(f"not able to send {cmd}")
       return False, None
-
-    if not self._read_echo(timeout):
-      logging.error(f"did not receive echo for {cmd}")
+    # assume echo enabled (ATE), so read back command
+    if not self._read_line(timeout):
+      self._my_logger.error(f"did not receive echo for {cmd}")
       return False, None
 
     # collect response
-    line = ""
     response = ""
-    found = False
-
-    while not found:
-      status, line = self._read_reponse(timeout)
+    while True:
+      status, line = self._read_line(timeout)
       if status:
-        response += '< ' + line + "\n"
-        if any(line.startswith(res) for res in self._RESPONSES):
-          found = True
+        if (len(line) > 0):
+          response += line + "\n"
+        if line.startswith(self._RESPONSES_OK):
+          self._my_logger.debug(f"response for {cmd} = {response}")
+          return True, response
+        elif line.startswith(self._RESPONSES_NOK): 
+          self._my_logger.error(f"response for {cmd} = {response}")
+          return False, response
       else:
-        logging.error(f"unexpected response for {cmd}")
+        self._my_logger.error(f"unexpected status for {cmd}")
         return False, None
 
-    if line.startswith(self._RESPONSES[0]):
-      return True, response
-    else:
-      logging.error(f"did not receive 'OK' for {cmd}")
-      return False, response
+  def _AT_send_payload(self, payload="", timeout=_DEFAULT_TIMEOUT):
+    response = ""
+    status = self._write_line(payload)
+    while True:
+      status, line = self._read_line(timeout)
+      if status:
+        if (len(line) > 0):
+          response += line + "\n"
+        if line.startswith(self._RESPONSES_OK):
+          return True, response
+      else:
+        self._my_logger.error(f"unexpected status for 'send_payload'")
+        return False, None
+      
+  def _AT_receive_payload(self, timeout=_DEFAULT_TIMEOUT):
+    response = ""
+    while True:
+      status, line = self._read_line(timeout)
+      if status:
+        if (len(line) > 0):
+          response += line + "\n"
+        if line.startswith(self._RESPONSES_OK):
+          return True, response
+      else:
+        self._my_logger.error(f"unexpected status for 'receive_payload'")
+        return False, None
 
-  def _wait_for_urc(self, urc="", timeout=_DEFAULT_TIMEOUT):
+  def _AT_wait_for_urc(self, urc="", timeout=_DEFAULT_TIMEOUT):
     # collect all responses until given URC is found
     response = ""
     while True:
-      status, line = self._read_reponse(timeout)
-      logging.debug(line)
+      status, line = self._read_line(timeout)
       if status:
-        response += '< ' + line + "\n"
+        if (len(line) > 0):
+          response += line + "\n"
         if line.startswith(urc):
           return True, response
       else:
-        logging.error(f"incorrect response for {urc}")
+        self._my_logger.error(f"incorrect response for {urc}")
         return False
+
+############################################################################################################
+# QUECTEL GENERAL COMMANDS
+############################################################################################################
 
   def AT(self):
     # Generic AT command to check if modem is alive
     cmd = "AT"
-    status, response = self._send_ATcmd(cmd, 0)
-    return status, cmd, response
-
-  def ATE(self, echo_on=True):
-    # Set echo on or off
-    cmd = "ATE1" if echo_on else "ATE0"
-    status, response = self._send_ATcmd(cmd, 0)
+    status, response = self._AT_send_cmd(cmd)
     return status, cmd, response
 
   def ATI(self):
     # Request product identification information
     cmd = "ATI"
-    status, response = self._send_ATcmd(cmd, 4)
+    status, response = self._AT_send_cmd(cmd)
     return status, cmd, response
 
   def AT_GSN(self):
     # Request product serial number identification (IMEI  number)
     cmd = "AT+GSN"
-    status, response = self._send_ATcmd(cmd, 2)
+    status, response = self._AT_send_cmd(cmd)
     return status, cmd, response
 
   def AT_V(self):
     # Request current configuration
     cmd = "AT&V"
-    status, response = self._send_ATcmd(cmd, 18)
+    status, response = self._AT_send_cmd(cmd)
+    return status, cmd, response
+
+  def ATE(self, echo_on=True):
+    # Set echo on or off
+    cmd = "ATE1" if echo_on else "ATE0"
+    status, response = self._AT_send_cmd(cmd)
     return status, cmd, response
   
   def AT_CFUN(self, radio_on=False):
     # Set radio on or off
     cmd = "AT+CFUN=1" if radio_on else "AT+CFUN=0"
-    if not self._send_ATcmd(cmd):
+    if not self._AT_send_cmd(cmd):
       return False, cmd
     if radio_on:
       urcs = ["+CPIN: READY", "+QUSIM: 1", "+QIND: SMS DONE"]
       for urc in urcs:
-        if not self._wait_for_urc(urc, timeout=10):
+        if not self._AT_wait_for_urc(urc, timeout=10):
           return False, cmd
     return True, cmd
+
+############################################################################################################
+# QUECTEL SERIAL INTERFACE CONTROL COMMANDS
+############################################################################################################
+#TBD
+
+############################################################################################################
+# QUECTEL (U)SIM RELATED COMMANDS
+############################################################################################################
+
+  def AT_CIMI_REQUEST(self):
+    # Request SIMs IMSI number, note: only valid after CFUN=1
+    cmd = "AT+CIMI"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QCCID_REQUEST(self):
+    # Request SIMs CCID number, note: only valid after CFUN=1
+    cmd = "AT+QCCID"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+############################################################################################################
+# QUECTEL NETWORK SERVICE COMMANDS
+############################################################################################################
 
   def AT_CREG(self):
     # Request GSM network registration status
     cmd = "AT+CREG?"
     connection_status = 1
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(f"response = {response}")
+      self._my_logger.debug(f"response = {response}")
       connection_status = int(response.split(",")[1][:1])
-      logging.debug(f"connection status = {connection_status}")
+      self._my_logger.debug(f"connection status = {connection_status}")
       return status, cmd, connection_status
+    return False, cmd, None
 
+  def AT_COPS_REQUEST(self):
+    # Request current operator
+    cmd = "AT+COPS?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_CSQ(self):
+    # Request signal quality (RSSI)
+    cmd = "AT+CSQ"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      signal_quality = int(response.split(":")[1].split(",")[0])
+      self._my_logger.debug(f"signal quality = {signal_quality}")
+      return status, cmd, signal_quality
+    return False, cmd, None
+
+  def AT_QNWINFO(self):
+    # Request network information
+    cmd = "AT+QNWINFO"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_QCSQ(self):
+    # Request network information
+    cmd = "AT+QCSQ"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+  
+############################################################################################################
+# QUECTEL SMS COMMANDS
+############################################################################################################
+
+############################################################################################################
+# QUECTEL PACKET DOMAIN COMMANDS
+############################################################################################################
+
+  def AT_CGATT_REQUEST(self):
+    # Request Packet Domain Service (PS) attach status
+    cmd = "AT+CGATT?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+  
+  def AT_CGDCONT_REQUEST(self):
+    # Request PDP context
+    cmd = "AT+CGDCONT?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, None
+  
+  def AT_CGACT_REQUEST(self):
+    # Request PDP context
+    cmd = "AT+CGACT?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, None
+
+  def AT_CGPADDR_REQUEST(self):
+    # Request PDP IP address
+    cmd = "AT+CGPADDR=" + str(self._CID)
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_CGREG_REQUEST(self):
+    # Request EGPRS network registration status
+    # NOTE: only call when CFUN=1, otherwise an error will be returned
+    cmd = "AT+CGREG?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
+
+  def AT_CGEREP_REQUEST(self):
+    # Request Packet Domain event reporting
+    # NOTE: only call when CFUN=1, otherwise an error will be returned
+    cmd = "AT+CGEREP?"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
     return False, cmd, None
 
   def AT_CEREG(self):
     # Request LTE network registration status
     cmd = "AT+CEREG?"
     connection_status = 1
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(f"response = {response}")
+      self._my_logger.debug(f"response = {response}")
       connection_status = int(response.split(",")[1][:1])
-      logging.debug(f"connection status = {connection_status}")
+      self._my_logger.debug(f"connection status = {connection_status}")
       return status, cmd, connection_status
-
     return False, cmd, None
 
-  def AT_CSQ(self):
-    # Request signal quality (RSSI)
-    cmd = "AT+CSQ"
-    status, response = self._send_ATcmd(cmd)
-    if status:
-      logging.debug(response)
-      signal_quality = int(response.split(":")[1].split(",")[0])
-      logging.debug(f"signal quality = {signal_quality}")
-      return status, cmd, signal_quality
-
-    return False, cmd, None
-
-  def AT_CGATT_REQUEST(self):
-    # Request GPRS attach status
-    cmd = "AT+CGATT?"
-    status, response = self._send_ATcmd(cmd)
-    if status:
-      logging.debug(response)
-      return status, cmd, response
-
-    return False, cmd, None
   
-  def AT_CGEREP_REQUEST(self):
-    # Request GPRS event reporting
-    # NOTE: only call when CFUN=1, otherwise an error will be returned
-    cmd = "AT+CGEREP?"
-    status, response = self._send_ATcmd(cmd)
-    if status:
-      logging.debug(response)
-      return status, cmd, response
+############################################################################################################
+# QUECTEL HARDWARE RELATED FUNCTIONS
+############################################################################################################
 
+  def AT_POWERDOWN(self):
+    # Modem power down, 0=immediate, 1=normal mode
+    cmd = "AT+POWD=1"
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+  #ToDo: wait for "POWERED DOWN" URC
     return False, cmd, None
-
-  def AT_CGPADDR_REQUEST(self):
-    # Request PDP IP address
-    cmd = "AT+CGPADDR=" + str(self._CID)
-    status, response = self._send_ATcmd(cmd)
-    if status:
-      logging.debug(response)
-      return status, cmd, response
-
-    return False, cmd, None
-
-  def AT_CGDCONT_REQUEST(self):
-    # Request PDP context
-    cmd = "AT+CGDCONT?"
-    status, response = self._send_ATcmd(cmd)
-    if status:
-      logging.debug(response)
-      return status, cmd, response
-
-    return False, None
   
   def AT_CCLK_REQUEST(self):
     # Request PDP context
     cmd = "AT+CCLK?"
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
+    return False, cmd, None
+  
+  def AT_QTEMP(self):
+    # request silicon temperatures
+    cmd = 'AT+QTEMP'
+    status, response = self._AT_send_cmd(cmd)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, None
 
-    return False, None
-  
-  #ToDo: add more commands
-  
 ############################################################################################################
-# QUECTEL MISC FUNCTIONS
+# QUECTEL TCPIP FUNCTIONS
 ############################################################################################################
 
   def AT_QPING(self):
     # ping an IP address
     # cmd = 'AT+QPING=1,"45.82.191.174"' # www.felixdonkers.nl
     cmd = 'AT+QPING=1,"8.8.8.8"' # google DNS
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       # also collect multiple URC responses
-      status, response = self._wait_for_urc("+QPING: 0,4", DEFAULT_TIMEOUT)
+      status, response = self._AT_wait_for_urc("+QPING: 0,4", self._DEFAULT_TIMEOUT)
       if status:
-        logging.debug(response)
+        self._my_logger.debug(response)
         return status, cmd, response
     return False, cmd, None
 
   def AT_QNTP(self):
     # request time from NTP server
     cmd = 'AT+QNTP=1,"nl.pool.ntp.org",123' # google DNS
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       # also collect multiple URC responses
-      status, response = self._wait_for_urc("+QNTP:", DEFAULT_TIMEOUT)
+      status, response = self._AT_wait_for_urc("+QNTP:", self._DEFAULT_TIMEOUT)
       if status:
-        logging.debug(response)
+        self._my_logger.debug(response)
         return status, cmd, response
     return False, cmd, None
+
 
 ############################################################################################################
 # QUECTEL GNSS FUNCTIONS
@@ -277,7 +399,7 @@ class bg95_atcmds (bg95_serial, ):
   def extract_urc(response, urc): 
     # extract URC response
     for line in response.split("\n"):
-      if line.startswith('< '+urc):
+      if line.startswith(urc):
         r = line.split(":")[1].strip()
         return True, r
     return False, None
@@ -285,48 +407,53 @@ class bg95_atcmds (bg95_serial, ):
   def AT_QGPSCFG_PRIO(self, gnss_prio=1):
     # set GNSS priority to 0 (GNSS) or 1 (WWAN)
     cmd = f'AT+QGPSCFG="priority",{gnss_prio},0'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, None
 
   def AT_QGPS_ON(self):
     # switch GNSS ON
     cmd = f'AT+QGPS=1,1'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, None
 
   def AT_QGPS_END(self):
     # switch GNSS OFF
     cmd = f'AT+QGPSEND'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, None
 
   def AT_QGPS_STATUS_REQUEST(self):
     # query GNSS ON/OFF status
     cmd = f'AT+QGPS?'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, None
 
   def AT_QGPSLOC_REQUEST(self):
     # query GNSS location
     cmd = f'AT+QGPSLOC?'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, response
 
+
+############################################################################################################
+# QUECTEL SSL FUNCTIONS
+############################################################################################################
+#TBD
 
 ############################################################################################################
 # QUECTEL HTTP(S) FUNCTIONS
@@ -366,20 +493,69 @@ class bg95_atcmds (bg95_serial, ):
     730: "Invalid parameter"
   }                          
 
-  def AT_QHTTPCFG(self):
+  def AT_QHTTPCFG_REQUEST(self):
     # query IP address
     cmd = f'AT+QHTTPCFG?'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, response
 
-  def AT_QIACT(self):
+  def AT_QIACT_REQUEST(self):
     # query IP address
     cmd = f'AT+QIACT?'
-    status, response = self._send_ATcmd(cmd)
+    status, response = self._AT_send_cmd(cmd)
     if status:
-      logging.debug(response)
+      self._my_logger.debug(response)
       return status, cmd, response
     return False, cmd, response
+
+  def AT_QHTTPURL(self, url="http://echo.free.beeceptor.com/?test=3"):
+    # set URL
+    URL_TIMEOUT = 60
+    cmd = f'AT+QHTTPURL={len(url)}'
+    status, response = self._AT_send_cmd(cmd, timeout=URL_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+      status, response2 = self._AT_send_payload(url, timeout=URL_TIMEOUT)
+      response += response2
+      if status:
+        self._my_logger.debug(response)
+        return status, cmd, response
+    return False, cmd, response
+  
+  def AT_QHTTPGET(self):
+    GET_TIMEOUT = 5
+    cmd = f'AT+QHTTPGET={GET_TIMEOUT}'
+    status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+      status, response = self._AT_wait_for_urc("+QHTTPGET:", GET_TIMEOUT)
+      if status:
+        self._my_logger.debug(response)
+        return status, cmd, response
+    return False, cmd, response
+
+  def AT_QHTTPREAD(self):
+    GET_TIMEOUT = 5
+    cmd = f'AT+QHTTPREAD={GET_TIMEOUT}'
+    status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+    else:
+      return False, cmd, response
+    
+    status, payload = self._AT_receive_payload(GET_TIMEOUT)
+    if status:
+      self._my_logger.debug(f"Get payload =\n{response}")
+    else:
+      return False, cmd, response
+
+    status, response = self._AT_wait_for_urc("+QHTTPREAD:", self._DEFAULT_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+    else:
+      return False, cmd, response
+
+    return status, cmd, payload

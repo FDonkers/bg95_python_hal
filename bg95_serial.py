@@ -59,7 +59,7 @@ class bg95_serial:
         try:
           self._ser.timeout = timeout
           # _read data from the serial port
-          response = self._ser.readline().decode().strip()
+          response = self._ser.readline().decode().rstrip()
           # self._my_logger.debug(f"Received: {response}")
           return True, response
         except Exception as e:

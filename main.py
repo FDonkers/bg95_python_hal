@@ -7,73 +7,85 @@ from bg95_atcmds import bg95_atcmds
 logging.basicConfig(format='%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S', level=logging.INFO)
 
 ############################################################################################################
-# MISC SUPPORT FUNCTIONS
+# MISC HIGH LEVEL FUNCTIONS
 ############################################################################################################
 
-def modem_run_general_at_commands():
+def run_modem_general_at_commands():
   status = my_bg95.AT()
+  # check if modem is alive
   if status:
     logging.info(f"PASSED!")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.ATI()
+  # request product information
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.ATE(True)
+  # turn on echo
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.AT_GSN()
+  # request IMEI
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.AT_CCLK_REQUEST()
+  # request current time
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  # status, cmd, response = my_bg95.AT_V()
-  # if status:
-    # logging.info(f"{cmd} PASSED! with response:\n{response}")
-  # else:
-  #   logging.info(f"{cmd} FAILED!")
-  #   return False
+  status, cmd, response = my_bg95.AT_QTEMP()
+  # request silicon temperatures
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
 
   return True
 
-def modem_connect_to_network():
+def disconnect_modem_from_network():
+  status, cmd = my_bg95.AT_CFUN(0)
+  if status:
+    logging.info(f"{cmd} PASSED!")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  return True
+
+def connect_modem_to_network():
+  # make sure to be disconnected first
   status, cmd = my_bg95.AT_CFUN(0)
   if status:
     logging.info(f"{cmd} PASSED!")
 
+  # connect to network
   status, cmd = my_bg95.AT_CFUN(1)
   if status:
     logging.info(f"{cmd} PASSED!")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  status, cmd, response = my_bg95.AT_CGEREP_REQUEST()
-  if status:
-    logging.info(f"{cmd} PASSED! with response:\n{response}")
-  else:
-    logging.info(f"{cmd} FAILED!")
-    return False
-
+  # wait for network registration
   response = 0
   while response != 1:
     status, cmd, response = my_bg95.AT_CREG()
@@ -81,16 +93,10 @@ def modem_connect_to_network():
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  status, cmd, response = my_bg95.AT_CGATT_REQUEST()
-  if status:
-    logging.info(f"{cmd} PASSED! with response:\n{response}")
-  else:
-    logging.info(f"{cmd} FAILED!")
-    return False
-
+  # wait for proper signal strength
   NO_SIGNAL = 99
   response = NO_SIGNAL
   while response == NO_SIGNAL:
@@ -99,33 +105,102 @@ def modem_connect_to_network():
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  return True
+
+
+def request_network_info():
+  status, cmd, response = my_bg95.AT_CGEREP_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_CGATT_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_QCSQ()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_CIMI_REQUEST()
+  # request IMSI, only valid after CFUN=1
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_QCCID_REQUEST()
+  # request CCID
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.AT_CGDCONT_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
-
+  
+  status, cmd, response = my_bg95.AT_CGACT_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+  
   status, cmd, response = my_bg95.AT_CGPADDR_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_CGREG_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.AT_CGEREP_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
+    return False
+  
+  status, cmd, response = my_bg95.AT_COPS_REQUEST()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False
+
+  status, cmd, response = my_bg95.AT_QNWINFO()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
     return False
 
   return True
 
-def modem_run_GNSS_commands():
+def run_modem_GNSS_commands():
   #ToDo: add 'assisted GNSS' commands, e.g. XTRA file download, etc
 
   # set priority to GNSS
@@ -189,8 +264,8 @@ def modem_run_GNSS_commands():
     logging.info(f"Latitude  = {r[1]}")
     logging.info(f"Longitude = {r[2]}\n")
   else:
-    logging.info(f"{cmd} FAILED!")
-    logging.info(f"returned {response}")
+    logging.error(f"{cmd} FAILED!")
+    logging.error(f"returned {response}")
     return False
 
   # switch OFF GNSS
@@ -198,7 +273,7 @@ def modem_run_GNSS_commands():
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   # set priority back to WWAN
@@ -209,49 +284,61 @@ def modem_run_GNSS_commands():
     logging.error(f"{cmd} FAILED!")
     return False
 
-def modem_run_IP_commands():
+def run_modem_IP_commands():
   status, cmd, response = my_bg95.AT_QPING()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   status, cmd, response = my_bg95.AT_QNTP()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
   return True
 
-def modem_run_HTTP_commands():
-  status, cmd, response = my_bg95.AT_QHTTPCFG()
+def run_modem_HTTP_commands():
+  status, cmd, response = my_bg95.AT_QHTTPCFG_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  status, cmd, response = my_bg95.AT_QIACT()
+  status, cmd, response = my_bg95.AT_QIACT_REQUEST()
   if status:
     logging.info(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
+    logging.error(f"{cmd} FAILED!")
     return False
 
-  return True
-
-def modem_disconnect_from_network():
-  status, cmd = my_bg95.AT_CFUN(0)
+def HTTP_GET(url):
+  status, cmd, response = my_bg95.AT_QHTTPURL(url)
   if status:
-    logging.info(f"{cmd} PASSED!")
+    logging.debug(f"{cmd} PASSED! with response:\n{response}")
   else:
-    logging.info(f"{cmd} FAILED!")
-    return False
+    logging.error(f"{cmd} FAILED!")
+    return False, None
 
-  return True
+  status, cmd, response = my_bg95.AT_QHTTPGET()
+  if status:
+    logging.debug(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QHTTPREAD()
+  if status:
+    logging.debug(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  return True, response
 
 ############################################################################################################
 # MAIN
@@ -267,29 +354,35 @@ if __name__ == "__main__":
     print("FAILED TO OPEN USB CONNECTION")
     exit()
 
-  modem_run_general_at_commands()
+  run_modem_general_at_commands()
 
-  # modem_run_GNSS_commands()
+  run_modem_GNSS_commands()
 
   ##### START TIMER
   my_timer.start()
 
-  modem_connect_to_network()
+  connect_modem_to_network()
+  request_network_info()
 
   ##### READ TIMER
   my_timer.time_passed()
 
-  # modem_run_IP_commands()
+  run_modem_IP_commands()
 
   ##### READ TIMER
   my_timer.time_passed()
 
-  modem_run_HTTP_commands()
+  # run_modem_HTTP_commands()
+  status, response = HTTP_GET("http://echo.free.beeceptor.com/?test=12345")
+  if status:
+    logging.info(f"HTTP GET PASSED! with response:\n{response}")
+  else:
+    logging.info(f"HTTP GET FAILED!")
 
   ##### READ TIMER
   my_timer.time_passed()
 
-  modem_disconnect_from_network()
+  disconnect_modem_from_network()
   
   my_bg95.close_usb()
 
