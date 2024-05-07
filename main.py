@@ -415,9 +415,7 @@ if __name__ == "__main__":
 
   # run_modem_HTTP_commands()
 
-  #TODO: fix SSL part of HTTPS_GET
-  status, response = HTTPS_GET("http://echo.free.beeceptor.com/?test=12345")
-  # status, response = HTTP_GET("http://echo.free.beeceptor.com/?test=12345")
+  status, response = HTTPS_GET("https://postman-echo.com/get/?foo1=bar1")
   if status:
     logging.info(f"HTTP GET PASSED! with response:\n{response}")
   else:

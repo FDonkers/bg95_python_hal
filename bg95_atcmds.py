@@ -455,8 +455,8 @@ class bg95_atcmds (bg95_serial):
 ############################################################################################################
 
   def AT_QSSLCFG_SSLVERSION(self):
-    # set SSL verification mode to 1 (TLS1.0) or 2 (TLS1.2)
-    cmd = f'AT+QSSLCFG="sslversion",1,1'
+    # set SSL verification mode to 0 (SSL3.0), 1 (TLS1.0), 2 (TLS1.1), 3 (TLS1.2), 4 (all)
+    cmd = f'AT+QSSLCFG="sslversion",1,4'
     status, response = self._AT_send_cmd(cmd)
     if status:
       self._my_logger.debug(response)
@@ -555,7 +555,8 @@ class bg95_atcmds (bg95_serial):
       return status, cmd, response
     return False, cmd, response
 
-  def AT_QHTTPURL(self, url="http://echo.free.beeceptor.com/?test=3"):
+  #TODO: fix TLS version for https://echo.free.beeceptor.com/ -> +QHTTPGET: 701
+  def AT_QHTTPURL(self, url="http://postman-echo.com/get/"):
     # set URL
     URL_TIMEOUT = 80
     cmd = f'AT+QHTTPURL={len(url)}'
