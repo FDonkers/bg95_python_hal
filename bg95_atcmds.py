@@ -22,8 +22,7 @@ class bg95_atcmds (bg95_serial):
 
   def __init__(self, logger=None):
     self._my_logger = logger
-    super().__init__(log_handle=self._my_logger, default_timeout = self._DEFAULT_TIMEOUT)
-    pass
+    super().__init__(logger=self._my_logger, default_timeout = self._DEFAULT_TIMEOUT)
 
 ############################################################################################################
 # BASIC AT CMD FUNCTIONS
@@ -396,7 +395,7 @@ class bg95_atcmds (bg95_serial):
     549: "Unknown error"
   }
 
-  def extract_urc(response, urc): 
+  def extract_urc(self, response, urc):
     # extract URC response
     for line in response.split("\n"):
       if line.startswith(urc):

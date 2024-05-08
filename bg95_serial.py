@@ -12,8 +12,8 @@ class bg95_serial:
   _my_logger = None
   _default_timeout = 0
 
-  def __init__(self, log_handle=None, port='COM11', baudrate=115200, default_timeout = 1):
-    self._my_logger = log_handle
+  def __init__(self, logger=None, port='COM11', baudrate=115200, default_timeout = 1):
+    self._my_logger = logger
     self._port = port
     self._baudrate = baudrate
     self._default_timeout = 0
