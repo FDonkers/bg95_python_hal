@@ -340,6 +340,30 @@ def HTTP_GET(url):
 
   return True, response
 
+def HTTP_POST(url, body):
+  status, cmd, response = my_bg95.AT_QHTTPURL(url)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QHTTPPOST(body)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QHTTPREAD()
+  if status:
+    logging.info(f"{cmd} PASSED!")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  return True, response
+
 def HTTPS_GET(url):
   status, cmd, response = my_bg95.AT_QHTTPCFG_RESPONSEHEADER(True)
   if status:
@@ -381,6 +405,47 @@ def HTTPS_GET(url):
   status, response = HTTP_GET(url)
   return status, response
 
+def HTTPS_POST(url, body):
+  status, cmd, response = my_bg95.AT_QHTTPCFG_RESPONSEHEADER(True)
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QHTTPCFG_SSLCTXID()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_SSLVERSION()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_CIPHERSUITE()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  status, cmd, response = my_bg95.AT_QSSLCFG_SECLEVEL()
+  if status:
+    logging.info(f"{cmd} PASSED! with response:\n{response}")
+  else:
+    logging.error(f"{cmd} FAILED!")
+    return False, None
+
+  run_modem_HTTP_commands()
+
+  status, response = HTTP_POST(url, body)
+  return status, response
+
 ############################################################################################################
 # MAIN
 ############################################################################################################
@@ -416,6 +481,12 @@ if __name__ == "__main__":
   # run_modem_HTTP_commands()
 
   status, response = HTTPS_GET("https://postman-echo.com/get/?foo1=bar1")
+  if status:
+    logging.info(f"HTTP GET PASSED! with response:\n{response}")
+  else:
+    logging.error(f"HTTP GET FAILED!")
+
+  status, response = HTTPS_POST("https://postman-echo.com/post/", "foo1=bar1")
   if status:
     logging.info(f"HTTP GET PASSED! with response:\n{response}")
   else:

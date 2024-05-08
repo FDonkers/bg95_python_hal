@@ -564,11 +564,16 @@ class bg95_atcmds (bg95_serial):
     status, response = self._AT_send_cmd(cmd, timeout=URL_TIMEOUT)
     if status:
       self._my_logger.debug(response)
-      status, response2 = self._AT_send_payload(url, timeout=URL_TIMEOUT)
-      response += response2
-      if status:
-        self._my_logger.debug(response)
-        return status, cmd, response
+    else:
+      return False, cmd, response
+
+    # wait for URC. ToDo analyse urc for non-0 status
+    status, response2 = self._AT_send_payload(url, timeout=URL_TIMEOUT)
+    response += response2
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+
     return False, cmd, response
   
   def AT_QHTTPGET(self):
@@ -578,28 +583,60 @@ class bg95_atcmds (bg95_serial):
     status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
     if status:
       self._my_logger.debug(response)
-      status, response = self._AT_wait_for_urc("+QHTTPGET:", GET_TIMEOUT)
-      if status:
-        self._my_logger.debug(response)
-        return status, cmd, response
+    else:
+      return False, cmd, response
+
+    # wait for URC. ToDo analyse urc for non-0 status
+    status, response = self._AT_wait_for_urc("+QHTTPGET:", GET_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+    return False, cmd, response
+
+  def AT_QHTTPPOST(self, body="test=1234"):
+    # send POST request
+    POST_TIMEOUT = 80
+    cmd = f'AT+QHTTPPOST={len(body)},{POST_TIMEOUT},{POST_TIMEOUT}'
+    status, response = self._AT_send_cmd(cmd, timeout=POST_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+    else:
+      return False, cmd, response
+
+    # send payload
+    status, response2 = self._AT_send_payload(body, timeout=POST_TIMEOUT)
+    response += response2
+    if status:
+      self._my_logger.debug(response)
+    else:
+      return False, cmd, response
+
+    # wait for URC. ToDo analyse urc for non-0 status
+    status, response = self._AT_wait_for_urc("+QHTTPPOST:", POST_TIMEOUT)
+    if status:
+      self._my_logger.debug(response)
+      return status, cmd, response
+
     return False, cmd, response
 
   def AT_QHTTPREAD(self):
     # read GET response
-    GET_TIMEOUT = 80
-    cmd = f'AT+QHTTPREAD={GET_TIMEOUT}'
-    status, response = self._AT_send_cmd(cmd, timeout=GET_TIMEOUT)
+    READ_TIMEOUT = 80
+    cmd = f'AT+QHTTPREAD={READ_TIMEOUT}'
+    status, response = self._AT_send_cmd(cmd, timeout=READ_TIMEOUT)
     if status:
       self._my_logger.debug(response)
     else:
       return False, cmd, response
     
-    status, payload = self._AT_receive_payload(GET_TIMEOUT)
+    # read payload
+    status, payload = self._AT_receive_payload(READ_TIMEOUT)
     if status:
       self._my_logger.debug(f"Get payload =\n{response}")
     else:
       return False, cmd, response
 
+    # wait for URC. ToDo analyse urc for non-0 status
     status, response = self._AT_wait_for_urc("+QHTTPREAD:", self._DEFAULT_TIMEOUT)
     if status:
       self._my_logger.debug(response)
