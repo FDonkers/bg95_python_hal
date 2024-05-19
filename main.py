@@ -20,14 +20,14 @@ if __name__ == "__main__":
     print("FAILED TO OPEN USB CONNECTION")
     exit()
 
-  my_bg95.run_modem_GNSS_commands()
+  # my_bg95.run_modem_GNSS_commands()
 
   # my_bg95.run_modem_general_at_commands()
 
   # ##### START TIMER
   # my_timer.start()
 
-  # my_bg95.connect_modem_to_network()
+  my_bg95.connect_modem_to_network()
   # my_bg95.request_network_info()
 
   # ##### READ TIMER
@@ -40,17 +40,33 @@ if __name__ == "__main__":
 
   # my_bg95.run_modem_HTTP_commands()
 
-  # status, response = my_bg95.HTTPS_GET("https://postman-echo.com/get/?foo1=bar1")
+  # NO TLS
+
+  # status, response = my_bg95.HTTP_GET("http://postman-echo.com/get/?foo1=bar1")
   # if status:
-  #   logging.info(f"HTTP GET PASSED! with response:\n{response}")
+  #   logging.info(f"HTTP_POST PASSED! with response:\n{response["result"]}\n===payload start===\n{response["payload"]}\n===payload end===")
   # else:
-  #   logging.error(f"HTTP GET FAILED!")
+  #   logging.error(f"HTTP_GET FAILED!")
+
+  # status, response = my_bg95.HTTP_POST("http://postman-echo.com/post/", "foo1=bar1")
+  # if status:
+  #   logging.info(f"HTTP_POST PASSED! with response:\n{response["result"]}\n===payload start===\n{response["payload"]}\n===payload end===")
+  # else:
+  #   logging.error(f"HTTP_POST FAILED!")
+
+  # with TLS
+
+  status, response = my_bg95.HTTPS_GET("https://postman-echo.com/get/?foo1=bar1")
+  if status:
+    logging.info(f"HTTPS_GET PASSED! with response:\n{response["result"]}\n===payload start===\n{response["payload"]}\n===payload end===")
+  else:
+    logging.error(f"HTTPS_GET FAILED!")
 
   # status, response = my_bg95.HTTPS_POST("https://postman-echo.com/post/", "foo1=bar1")
   # if status:
-  #   logging.info(f"HTTP POST PASSED! with response:\n{response}")
+  #   logging.info(f"HTTPS_POST PASSED! with response:\n{response["result"]}\n===payload start===\n{response["payload"]}\n===payload end===")
   # else:
-  #   logging.error(f"HTTP POST FAILED!")
+  #   logging.error(f"HTTPS_POST FAILED!")
 
   # ##### READ TIMER
   # my_timer.time_passed()
