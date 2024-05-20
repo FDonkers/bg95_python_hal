@@ -41,7 +41,7 @@ class bg95_serial:
     self._connected = False
     self._my_logger.debug(f"Serial port {self._port} is closed.")
 
-  def _write_line(self, command):
+  def _write_line(self, command) -> bool:
     if self._connected:
         try:
             # Write data to the serial port
