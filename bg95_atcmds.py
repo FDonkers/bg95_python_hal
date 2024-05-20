@@ -13,10 +13,11 @@ class bg95_atcmds (bg95_serial):
   _SERIAL_UNDEFINED = -4
 
   _CME_ERROR_CODES =  {
-   _SERIAL_UNDEFINED: "Undefined AT command error",
-   _SERIAL_ECHO_ERROR: "Serial port echo error",
-   _SERIAL_TIMEOUT_ERROR: "Serial port timeout error",
-   _SERIAL_OK: "AT command OK",
+    _SERIAL_UNDEFINED: "Undefined AT command error",
+    _SERIAL_ECHO_ERROR: "Serial port echo error",
+    _SERIAL_TIMEOUT_ERROR: "Serial port timeout error",
+    _SERIAL_OK: "AT command OK",
+    # CME ERRORS
     0: "Phone failure",
     1: "No connection to phone",
     2: "Phone-adaptor link reserved",
@@ -53,7 +54,77 @@ class bg95_atcmds (bg95_serial):
     45: "Service provider personalization PUK required",
     46: "Corporate personalization PIN required",
     47: "Corporate personalization PUK required",
-    100: "Unknown error",
+    # GNSS ERRORS
+    501: "Invalid parameter",
+    502: "Operation not supported",
+    503: "GNSS subsystem busy",
+    504: "Session is ongoing",
+    505: "Session not active",
+    506: "Operation timeout",
+    507: "Function not enabled",
+    508: "Time information error",
+    509: "XTRA not enabled",
+    512: "Validity time is out of range",
+    513: "Internal resource error",
+    514: "GNSS locked",
+    515: "End by E911",
+    516: "No fix",
+    517: "Geo-fence ID does not exist",
+    518: "Sync time failed",
+    519: "XTRA file does not exist",
+    520: "XTRA file on downloading",
+    521: "XTRA file is valid",
+    522: "GNSS is working",
+    523: "Time injection error",
+    524: "XTRA file is invalid",
+    549: "Unknown error", 
+    # TCIP/IP ERRORS
+    550: "unknown error",
+    551: "operation blocked",
+    552: "invalid parameters",
+    553: "Memory allocation failed",
+    554: "create socket failed",
+    555: "operation not supported",
+    556: "socket bind failed",
+    557: "socket listen failed",
+    558: "socket write failed",
+    559: "socket read failed",
+    560: "socket accept failed",
+    561: "Activate pdp context failed",
+    562: "Deactivate pdp context failed",
+    563: "socket identity has been used",
+    564: "dns busy",
+    # HTTP(S) ERRORS
+    701: "HTTP(S) unknown error",
+    702: "HTTP(S) timeout",
+    703: "HTTP(S) busy",
+    704: "HTTP(S) UART busy",
+    705: "HTTP(S) no GET/POST/PUT requests",
+    706: "HTTP(S) network busy",
+    707: "HTTP(S) network open failed",
+    708: "HTTP(S) network no configuration",
+    709: "HTTP(S) network deactivated",
+    710: "HTTP(S) network error",
+    711: "HTTP(S) URL error",
+    712: "HTTP(S) empty URL",
+    713: "HTTP(S) IP address error",
+    714: "HTTP(S) DNS error",
+    715: "HTTP(S) socket create error",
+    716: "HTTP(S) socket connect error",
+    717: "HTTP(S) socket read error",
+    718: "HTTP(S) socket write error",
+    719: "HTTP(S) socket closed",
+    720: "HTTP(S) data encode error",
+    721: "HTTP(S) data decode error",
+    722: "HTTP(S) read timeout",
+    723: "HTTP(S) response failed",
+    724: "Incoming call busy",
+    725: "Voice call busy",
+    726: "Input timeout",
+    727: "Wait data timeout",
+    728: "Wait HTTP(S) response timeout",
+    729: "Memory allocation failed",
+    730: "Invalid parameter"
   }
   
   _AT_CMD_OK = "OK"
@@ -569,25 +640,6 @@ class bg95_atcmds (bg95_serial):
 # QUECTEL TCPIP FUNCTIONS
 ############################################################################################################
 
-  IP_ERROR_CODES =  {
-    0:   "operate successfully",
-    550: "unknown error",
-    551: "operation blocked",
-    552: "invalid parameters",
-    553: "Memory allocation failed",
-    554: "create socket failed",
-    555: "operation not supported",
-    556: "socket bind failed",
-    557: "socket listen failed",
-    558: "socket write failed",
-    559: "socket read failed",
-    560: "socket accept failed",
-    561: "Activate pdp context failed",
-    562: "Deactivate pdp context failed",
-    563: "socket identity has been used",
-    564: "dns busy"
-  }
-
   PDP_CONTEXT_ID = 1
 
   def AT_QIACT(self) -> Tuple[bool, str, Dict[str, str | int]]:
@@ -637,7 +689,7 @@ class bg95_atcmds (bg95_serial):
 
   def AT_QICSGP_REQUEST(self) -> Tuple[bool, str, Dict[str, str]]:
     cmd = "AT+QICSGP=1"
-    at_status, response = self._AT_send_cmd(cmd)
+    at_status, at_response, at_result = self._AT_send_cmd(cmd)
     if at_status:
       response = {"result": "OK"}
     else:
@@ -648,7 +700,7 @@ class bg95_atcmds (bg95_serial):
     # ping an IP address
     # cmd = 'AT+QPING=1,"45.82.191.174"' # www.felixdonkers.nl
     cmd = 'AT+QPING=1,"8.8.8.8"' # google DNS
-    at_status, response = self._AT_send_cmd(cmd)
+    at_status, at_response, at_result = self._AT_send_cmd(cmd)
     # default response
     response = {"result": "ERROR",
                 "finresult": 550,
@@ -711,34 +763,6 @@ class bg95_atcmds (bg95_serial):
 ############################################################################################################
 # QUECTEL GNSS FUNCTIONS
 ############################################################################################################
-
-  #TODO: new format for responses
-
-  GNSS_ERROR_CODES =  {
-    501: "Invalid parameter",
-    502: "Operation not supported",
-    503: "GNSS subsystem busy",
-    504: "Session is ongoing",
-    505: "Session not active",
-    506: "Operation timeout",
-    507: "Function not enabled",
-    508: "Time information error",
-    509: "XTRA not enabled",
-    512: "Validity time is out of range",
-    513: "Internal resource error",
-    514: "GNSS locked",
-    515: "End by E911",
-    516: "No fix",
-    517: "Geo-fence ID does not exist",
-    518: "Sync time failed",
-    519: "XTRA file does not exist",
-    520: "XTRA file on downloading",
-    521: "XTRA file is valid",
-    522: "GNSS is working",
-    523: "Time injection error",
-    524: "XTRA file is invalid",
-    549: "Unknown error"
-  }
 
   def AT_QGPSCFG_PRIO(self, gnss_prio=1) -> Tuple[bool, str, Dict[str, str | int]]:
     # set GNSS priority to 0 (GNSS) or 1 (WWAN)
@@ -819,7 +843,6 @@ class bg95_atcmds (bg95_serial):
       response = default_response
     return at_status, cmd, response
 
-
 ############################################################################################################
 # QUECTEL SSL FUNCTIONS
 ############################################################################################################
@@ -858,39 +881,6 @@ class bg95_atcmds (bg95_serial):
 ############################################################################################################
 # QUECTEL HTTP(S) FUNCTIONS
 ############################################################################################################
-
-  HTTPS_ERROR = {
-    701: "HTTP(S) unknown error",
-    702: "HTTP(S) timeout",
-    703: "HTTP(S) busy",
-    704: "HTTP(S) UART busy",
-    705: "HTTP(S) no GET/POST/PUT requests",
-    706: "HTTP(S) network busy",
-    707: "HTTP(S) network open failed",
-    708: "HTTP(S) network no configuration",
-    709: "HTTP(S) network deactivated",
-    710: "HTTP(S) network error",
-    711: "HTTP(S) URL error",
-    712: "HTTP(S) empty URL",
-    713: "HTTP(S) IP address error",
-    714: "HTTP(S) DNS error",
-    715: "HTTP(S) socket create error",
-    716: "HTTP(S) socket connect error",
-    717: "HTTP(S) socket read error",
-    718: "HTTP(S) socket write error",
-    719: "HTTP(S) socket closed",
-    720: "HTTP(S) data encode error",
-    721: "HTTP(S) data decode error",
-    722: "HTTP(S) read timeout",
-    723: "HTTP(S) response failed",
-    724: "Incoming call busy",
-    725: "Voice call busy",
-    726: "Input timeout",
-    727: "Wait data timeout",
-    728: "Wait HTTP(S) response timeout",
-    729: "Memory allocation failed",
-    730: "Invalid parameter"
-  }                          
 
   def AT_QHTTPCFG_REQUEST(self) -> Tuple[bool, str, Dict[str, str | int]]:
     # query IP address
