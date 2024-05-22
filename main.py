@@ -28,7 +28,7 @@ if __name__ == "__main__":
   total_time_https_get = 0
   total_time_http_post = 0
   total_time_https_post = 0
-  for i in range(100):
+  for i in range(1):
     logging.info(f"***** Loop {i}")
 
     ##### HTTP_GET
