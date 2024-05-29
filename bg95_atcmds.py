@@ -380,7 +380,7 @@ class bg95_atcmds (bg95_serial):
     cmd = "AT+CREG?"
     at_status, at_response, at_result = self._AT_send_cmd(cmd)
     if at_status:
-      regex = r'\+CEREG: (?P<cid>\d+),(?P<gsm_registration_stat>\d+)'
+      regex = r'\+CREG: (?P<cid>\d+),(?P<gsm_registration_stat>\d+)'
       match = re.search(regex, at_response)
       gsm_registration_stat = int(match.group('gsm_registration_stat'))
       # 0=not registered, 1=registered, 2=not registered, searching, 3=registration denied, 4=unknown, 5=registered, roaming
