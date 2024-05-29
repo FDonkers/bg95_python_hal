@@ -13,7 +13,7 @@ class bg95_atcmds (bg95_serial):
   _SERIAL_UNDEFINED = -4
 
   _CME_ERROR_CODES =  {
-    _SERIAL_UNDEFINED: "Undefined AT command error",
+    _SERIAL_UNDEFINED: "Undefined AT command error", 
     _SERIAL_ECHO_ERROR: "Serial port echo error",
     _SERIAL_TIMEOUT_ERROR: "Serial port timeout error",
     _SERIAL_OK: "AT command OK",
@@ -151,6 +151,13 @@ class bg95_atcmds (bg95_serial):
     self._my_logger = logger
     super().__init__(logger=self._my_logger, default_timeout = self._DEFAULT_TIMEOUT)
 
+  def _get_cme_error_str(self, cme_error_code):
+    if cme_error_code in self._CME_ERROR_CODES:
+      return self._CME_ERROR_CODES[cme_error_code]
+    else:
+      return "Unknown error"
+  
+
 ############################################################################################################
 # BASIC AT CMD HELPER FUNCTIONS
 ############################################################################################################
@@ -168,7 +175,7 @@ class bg95_atcmds (bg95_serial):
       cme_error_code = self._SERIAL_ECHO_ERROR
 
     if cme_error_code != self._SERIAL_OK:
-      cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._CME_ERROR_CODES[{cme_error_code}]} # OK
+      cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._get_cme_error_str(cme_error_code)} # OK
       self._my_logger.error(cmd_result["CME_ERROR_STRING"])
       return False, cmd_response, cmd_result
 
@@ -190,14 +197,14 @@ class bg95_atcmds (bg95_serial):
           # at command returned 'ERROR'
           cme_error_code = self._SERIAL_UNDEFINED
         if cme_error_code is not None:
-          cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._CME_ERROR_CODES[cme_error_code]}
+          cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._get_cme_error_str(cme_error_code)}
           self._my_logger.debug(cmd_response) if (cme_error_code == self._SERIAL_OK) else self._my_logger.error(cmd_response)
           self._my_logger.debug(cmd_result) if (cme_error_code == self._SERIAL_OK) else self._my_logger.error(cmd_result)
           return (cme_error_code == self._SERIAL_OK), cmd_response, cmd_result
       else:
         # some unexpected error
         cme_error_code = self._SERIAL_UNDEFINED
-        cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._CME_ERROR_CODES[cme_error_code]}
+        cmd_result = {"cmd": {cmd}, "CME_ERROR_CODE": {cme_error_code}, "CME_ERROR_STRING": self._get_cme_error_str(cme_error_code)}
         self._my_logger.error(cmd_result["CME_ERROR_STRING"])
         return False, cmd_response, cmd_result
 

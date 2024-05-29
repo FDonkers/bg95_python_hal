@@ -4,7 +4,7 @@ from timer import timer
 from bg95_atcmds import bg95_atcmds
 
 class osi_layer(bg95_atcmds):
-  _AT_CMD_RETRY_INTERVAL = .25
+  _AT_CMD_RETRY_INTERVAL = .5
 
   def __init__(self, logger=None):
     self._my_logger = logger
@@ -159,19 +159,6 @@ class osi_layer(bg95_atcmds):
     status, cmd, response = self.AT_CFUN(1)
     if status:
       logging.debug(f"{cmd} PASSED!")
-    else:
-      logging.error(f"{cmd} FAILED!")
-      return False
-
-    # wait for EPS network registration
-    registered = False
-    while not registered:
-      status, cmd, response = self.AT_CEREG()
-      if status:
-        registered = (response["eps_registration_stat"] in [1,5])
-      time.sleep(self._AT_CMD_RETRY_INTERVAL)
-    if status:
-      logging.debug(f"{cmd} PASSED! with response:\n{response}")
     else:
       logging.error(f"{cmd} FAILED!")
       return False
